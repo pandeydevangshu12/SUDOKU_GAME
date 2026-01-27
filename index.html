@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ranked Sudoku: Cumulative</title>
+    <title>Ranked Sudoku: Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -88,17 +88,24 @@
             transition: background 0.2s;
         }
 
-        /* GRIDS */
+        /* --- GRID LOGIC FIXED --- */
+        
+        /* 9x9 (3x3 Blocks) */
         .grid-9 { grid-template-columns: repeat(9, 45px); grid-template-rows: repeat(9, 45px); }
         .grid-9 .cell:nth-child(3n) { border-right: 3px solid var(--ink); }
         .grid-9 .cell:nth-child(9n) { border-right: none; }
         .grid-9 .cell:nth-child(n+19):nth-child(-n+27), .grid-9 .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 3px solid var(--ink); }
 
+        /* 6x6 (2x3 Blocks) - FIXED CSS */
         .grid-6 { grid-template-columns: repeat(6, 55px); grid-template-rows: repeat(6, 55px); }
+        /* Vertical line every 3 columns */
         .grid-6 .cell:nth-child(3n) { border-right: 3px solid var(--ink); }
         .grid-6 .cell:nth-child(6n) { border-right: none; }
-        .grid-6 .cell:nth-child(n+13):nth-child(-n+18), .grid-6 .cell:nth-child(n+31):nth-child(-n+36) { border-bottom: 3px solid var(--ink); }
+        /* Horizontal line every 2 rows (Fixed Logic) */
+        .grid-6 .cell:nth-child(n+7):nth-child(-n+12) { border-bottom: 3px solid var(--ink); }
+        .grid-6 .cell:nth-child(n+19):nth-child(-n+24) { border-bottom: 3px solid var(--ink); }
 
+        /* 3x3 (No Blocks) */
         .grid-3 { grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); }
         
         .cell.fixed { font-weight: bold; color: var(--ink); cursor: default; }
@@ -108,7 +115,6 @@
         
         @keyframes shake { 0%, 100% {transform:translateX(0);} 25% {transform:translateX(-3px);} 75% {transform:translateX(3px);} }
         @keyframes flashSuccess { 0% {background: var(--paper);} 50% {background: #86efac;} 100% {background: var(--paper);} }
-
         .save-flash { animation: flashSuccess 1s ease; }
 
         .controls { margin-top: 20px; width: 100%; max-width: 405px; }
@@ -203,19 +209,16 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const SUPABASE_URL = 'https://fjroiowramtbnaubocvv.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcm9pb3dyYW10Ym5hdWJvY3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjY4OTIsImV4cCI6MjA4NTEwMjg5Mn0.GVsIQmiGKpnVZXzFvzu7op3wCCXwbtUIeK1wyxzon-w';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- STATE ---
         let currentSize = 9;
         let solutionBoard = [], playerBoard = [];
         let currentRoundScore = 0;
         let gameActive = false, timerInterval, secondsElapsed = 0;
         let selectedCell = null;
 
-        // --- AUTH ---
         async function handleAuth(type) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -250,21 +253,17 @@
         async function handleLogout() { await supabaseClient.auth.signOut(); location.reload(); }
         function closeRules() { document.getElementById('rules-modal').classList.add('hidden'); newGame(); }
 
-        // --- LEADERBOARD ---
         async function showLeaderboard() {
             const modal = document.getElementById('leaderboard-modal');
             const content = document.getElementById('leaderboard-content');
             modal.classList.remove('hidden');
             content.innerHTML = "Fetching scores...";
-
             const { data, error } = await supabaseClient
                 .from('game_scores')
                 .select('username, score')
                 .order('score', { ascending: false })
                 .limit(10);
-
             if (error) return content.innerText = "Error loading scores";
-
             let html = `<table><thead><tr><th>#</th><th>Player</th><th>Total Score</th></tr></thead><tbody>`;
             data.forEach((row, index) => {
                 html += `<tr><td>${index + 1}</td><td>${row.username || 'Anon'}</td><td>${row.score}</td></tr>`;
@@ -273,11 +272,9 @@
             content.innerHTML = html;
         }
 
-        // --- ENGINE ---
         function setMode(size) {
             currentSize = size;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            // Visual toggle
             if(size === 3) document.querySelectorAll('.mode-btn')[1].classList.add('active');
             else if(size === 6) document.querySelectorAll('.mode-btn')[2].classList.add('active');
             else document.querySelectorAll('.mode-btn')[3].classList.add('active');
@@ -296,7 +293,6 @@
                 let s = (secondsElapsed%60).toString().padStart(2,'0');
                 document.getElementById('timer').innerText = `${m}:${s}`;
             }, 1000);
-
             drawKeypad();
             const puzzle = generatePuzzle(currentSize);
             playerBoard = JSON.parse(JSON.stringify(puzzle));
@@ -316,8 +312,10 @@
 
         function generatePuzzle(size) {
             let b = Array.from({length: size}, () => Array(size).fill(0));
+            // Fixed generation seeds for 6x6
             if(size===9) { fillBox(b,0,0,3,3); fillBox(b,3,3,3,3); fillBox(b,6,6,3,3); }
-            else if(size===6) { fillBox(b,0,0,2,3); fillBox(b,2,3,2,3); }
+            else if(size===6) { fillBox(b,0,0,2,3); fillBox(b,2,3,2,3); } 
+            
             solveHelper(b, size);
             solutionBoard = JSON.parse(JSON.stringify(b));
             let attempts = size===9?40:(size===6?15:4);
@@ -349,6 +347,7 @@
                 let br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
                 for(let i=0; i<3; i++) for(let j=0; j<3; j++) if(b[br+i][bc+j]===n) return false;
             } else if(size===6) {
+                // FIXED 6x6 LOGIC: 2 rows high, 3 cols wide
                 let br=Math.floor(r/2)*2, bc=Math.floor(c/3)*3;
                 for(let i=0; i<2; i++) for(let j=0; j<3; j++) if(b[br+i][bc+j]===n) return false;
             }
@@ -385,7 +384,6 @@
             el.style.color = currentRoundScore<0?'var(--error)':'var(--blue-ink)';
         }
 
-        // --- CUMULATIVE SCORE SAVE ---
         async function checkWin() {
             let filled = 0;
             for(let r=0; r<currentSize; r++) for(let c=0; c<currentSize; c++) if(playerBoard[r][c]===solutionBoard[r][c]) filled++;
@@ -395,13 +393,10 @@
                 const { data: { user } } = await supabaseClient.auth.getUser();
                 if (!user) return alert("Not logged in!");
 
-                // 1. Get Old Score
                 let { data: rows, error } = await supabaseClient.from('game_scores').select('score').eq('user_id', user.id);
-                
                 let oldScore = (rows && rows.length > 0) ? rows[0].score : 0;
                 let newTotal = oldScore + currentRoundScore;
 
-                // 2. UPSERT (Insert or Update)
                 const { error: upsertError } = await supabaseClient
                     .from('game_scores')
                     .upsert({ 
@@ -422,9 +417,7 @@
                 }
             }
         }
-
         checkUser();
     </script>
 </body>
-
 </html>
