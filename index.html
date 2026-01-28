@@ -8,6 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
+        /* --- GLOBAL RESET FOR BETTER LAYOUT --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         :root {
             --paper: #f0ead6;
             --ink: #0f172a;
@@ -38,13 +43,16 @@
             background: rgba(0,0,0,0.85);
             display: flex; justify-content: center; align-items: center;
             z-index: 100;
+            padding: 20px; /* Ensure space on small screens */
         }
         .modal-box {
             background: var(--paper); padding: 2rem; border-radius: 5px;
-            text-align: center; max-width: 450px; width: 90%;
-            clip-path: polygon(1% 1%, 99% 0%, 98% 99%, 0% 98%);
+            text-align: center; max-width: 450px; width: 100%;
+            /* Tweaked for better visual balance */
+            clip-path: polygon(2% 1%, 98% 2%, 99% 98%, 1% 99%);
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            max-height: 80vh; overflow-y: auto;
+            max-height: 90vh; overflow-y: auto;
+            margin: auto; /* Extra ensure centering */
         }
         .hidden { display: none !important; }
 
@@ -52,7 +60,7 @@
         .star-rating { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
         .star { font-size: 2rem; cursor: pointer; color: #ccc; transition: color 0.2s; }
         .star.active { color: var(--gold); }
-        textarea { width: 100%; padding: 10px; margin-top: 10px; border: 2px solid var(--ink); background: transparent; font-family: inherit; }
+        textarea { width: 100%; padding: 10px; margin-top: 10px; border: 2px solid var(--ink); background: transparent; font-family: inherit; resize: vertical; }
 
         /* --- LEADERBOARD --- */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -127,7 +135,7 @@
         }
         button:active { transform: scale(0.95); }
         .action-btn { width: 100%; margin-top: 15px; background: var(--ink); color: var(--paper); border-radius: 5px; }
-        .auth-input { width: 80%; padding: 10px; margin: 10px 0; font-family: inherit; font-size: 1.2rem; border: 2px solid var(--ink); background: transparent; }
+        .auth-input { width: 100%; padding: 10px; margin: 10px 0; font-family: inherit; font-size: 1.2rem; border: 2px solid var(--ink); background: transparent; }
         
         @media (max-width: 500px) {
             .grid-9 { grid-template-columns: repeat(9, 34px); grid-template-rows: repeat(9, 34px); }
@@ -299,13 +307,9 @@
             else alert("Thanks for your feedback!");
             
             document.getElementById('feedback-modal').classList.add('hidden');
-            showLeaderboard(); // Show leaderboard after feedback
+            showLeaderboard();
         }
 
-        // Just close modal, effectively marking it as "seen" isn't saved but we won't nag until next refresh
-        // But since we check DB, skipping means it will ask again next time. 
-        // To prevent asking again even on skip, we could insert a blank/dummy feedback or check a localStorage flag.
-        // For now, we simply close.
         function skipFeedback() {
             document.getElementById('feedback-modal').classList.add('hidden');
             showLeaderboard();
