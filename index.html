@@ -258,7 +258,7 @@
                     : await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 if (type === 'signup') {
-                    msg.innerText = "Success! Check email."; msg.style.color = "var(--success)";
+                    msg.innerText = "Success! Now press login button."; msg.style.color = "var(--success)";
                 } else {
                     document.getElementById('auth-modal').classList.add('hidden');
                     document.getElementById('rules-modal').classList.remove('hidden');
@@ -491,3 +491,4 @@
     </script>
 </body>
 </html>
+
