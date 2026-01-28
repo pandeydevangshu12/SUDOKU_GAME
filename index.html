@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ranked Sudoku: Fixed</title>
+    <title>Ranked Sudoku</title>
     <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -48,6 +48,12 @@
         }
         .hidden { display: none !important; }
 
+        /* --- FEEDBACK STARS --- */
+        .star-rating { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
+        .star { font-size: 2rem; cursor: pointer; color: #ccc; transition: color 0.2s; }
+        .star.active { color: var(--gold); }
+        textarea { width: 100%; padding: 10px; margin-top: 10px; border: 2px solid var(--ink); background: transparent; font-family: inherit; }
+
         /* --- LEADERBOARD --- */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border-bottom: 2px solid var(--ink); padding: 8px; text-align: left; }
@@ -88,24 +94,17 @@
             transition: background 0.2s;
         }
 
-        /* --- GRID LOGIC FIXED --- */
-        
-        /* 9x9 (3x3 Blocks) */
+        /* GRIDS */
         .grid-9 { grid-template-columns: repeat(9, 45px); grid-template-rows: repeat(9, 45px); }
         .grid-9 .cell:nth-child(3n) { border-right: 3px solid var(--ink); }
         .grid-9 .cell:nth-child(9n) { border-right: none; }
         .grid-9 .cell:nth-child(n+19):nth-child(-n+27), .grid-9 .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 3px solid var(--ink); }
 
-        /* 6x6 (2x3 Blocks) - FIXED CSS */
         .grid-6 { grid-template-columns: repeat(6, 55px); grid-template-rows: repeat(6, 55px); }
-        /* Vertical line every 3 columns */
         .grid-6 .cell:nth-child(3n) { border-right: 3px solid var(--ink); }
         .grid-6 .cell:nth-child(6n) { border-right: none; }
-        /* Horizontal line every 2 rows (Fixed Logic) */
-        .grid-6 .cell:nth-child(n+7):nth-child(-n+12) { border-bottom: 3px solid var(--ink); }
-        .grid-6 .cell:nth-child(n+19):nth-child(-n+24) { border-bottom: 3px solid var(--ink); }
+        .grid-6 .cell:nth-child(n+7):nth-child(-n+12), .grid-6 .cell:nth-child(n+19):nth-child(-n+24) { border-bottom: 3px solid var(--ink); }
 
-        /* 3x3 (No Blocks) */
         .grid-3 { grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); }
         
         .cell.fixed { font-weight: bold; color: var(--ink); cursor: default; }
@@ -179,7 +178,26 @@
         </div>
     </div>
 
-    <h1>Sudoku</h1>
+    <div id="feedback-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h2>📝 Game Feedback</h2>
+            <p>You finished your first game! How was it?</p>
+            <div class="star-rating">
+                <span class="star" onclick="setRating(1)">★</span>
+                <span class="star" onclick="setRating(2)">★</span>
+                <span class="star" onclick="setRating(3)">★</span>
+                <span class="star" onclick="setRating(4)">★</span>
+                <span class="star" onclick="setRating(5)">★</span>
+            </div>
+            <textarea id="feedback-text" rows="3" placeholder="Any suggestions?"></textarea>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="submitFeedback()" style="flex:1; background:var(--ink); color:white;">Submit</button>
+                <button onclick="skipFeedback()" style="flex:1;">Skip</button>
+            </div>
+        </div>
+    </div>
+
+    <h1>Ranked Sudoku</h1>
 
     <div class="top-bar">
         <span id="user-display">Guest</span>
@@ -218,7 +236,9 @@
         let currentRoundScore = 0;
         let gameActive = false, timerInterval, secondsElapsed = 0;
         let selectedCell = null;
+        let currentRating = 0;
 
+        // --- AUTH ---
         async function handleAuth(type) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -253,6 +273,45 @@
         async function handleLogout() { await supabaseClient.auth.signOut(); location.reload(); }
         function closeRules() { document.getElementById('rules-modal').classList.add('hidden'); newGame(); }
 
+        // --- FEEDBACK LOGIC ---
+        function setRating(n) {
+            currentRating = n;
+            const stars = document.querySelectorAll('.star');
+            stars.forEach((s, i) => {
+                if(i < n) s.classList.add('active');
+                else s.classList.remove('active');
+            });
+        }
+
+        async function submitFeedback() {
+            const text = document.getElementById('feedback-text').value;
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            
+            if (currentRating === 0) return alert("Please select a star rating!");
+            
+            const { error } = await supabaseClient.from('game_feedback').insert([{
+                user_id: user.id,
+                rating: currentRating,
+                message: text
+            }]);
+
+            if (error) console.error(error);
+            else alert("Thanks for your feedback!");
+            
+            document.getElementById('feedback-modal').classList.add('hidden');
+            showLeaderboard(); // Show leaderboard after feedback
+        }
+
+        // Just close modal, effectively marking it as "seen" isn't saved but we won't nag until next refresh
+        // But since we check DB, skipping means it will ask again next time. 
+        // To prevent asking again even on skip, we could insert a blank/dummy feedback or check a localStorage flag.
+        // For now, we simply close.
+        function skipFeedback() {
+            document.getElementById('feedback-modal').classList.add('hidden');
+            showLeaderboard();
+        }
+
+        // --- LEADERBOARD ---
         async function showLeaderboard() {
             const modal = document.getElementById('leaderboard-modal');
             const content = document.getElementById('leaderboard-content');
@@ -272,6 +331,7 @@
             content.innerHTML = html;
         }
 
+        // --- ENGINE ---
         function setMode(size) {
             currentSize = size;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -312,10 +372,8 @@
 
         function generatePuzzle(size) {
             let b = Array.from({length: size}, () => Array(size).fill(0));
-            // Fixed generation seeds for 6x6
             if(size===9) { fillBox(b,0,0,3,3); fillBox(b,3,3,3,3); fillBox(b,6,6,3,3); }
-            else if(size===6) { fillBox(b,0,0,2,3); fillBox(b,2,3,2,3); } 
-            
+            else if(size===6) { fillBox(b,0,0,2,3); fillBox(b,2,3,2,3); }
             solveHelper(b, size);
             solutionBoard = JSON.parse(JSON.stringify(b));
             let attempts = size===9?40:(size===6?15:4);
@@ -347,7 +405,6 @@
                 let br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
                 for(let i=0; i<3; i++) for(let j=0; j<3; j++) if(b[br+i][bc+j]===n) return false;
             } else if(size===6) {
-                // FIXED 6x6 LOGIC: 2 rows high, 3 cols wide
                 let br=Math.floor(r/2)*2, bc=Math.floor(c/3)*3;
                 for(let i=0; i<2; i++) for(let j=0; j<3; j++) if(b[br+i][bc+j]===n) return false;
             }
@@ -384,6 +441,7 @@
             el.style.color = currentRoundScore<0?'var(--error)':'var(--blue-ink)';
         }
 
+        // --- CUMULATIVE SCORE & CHECK FEEDBACK ---
         async function checkWin() {
             let filled = 0;
             for(let r=0; r<currentSize; r++) for(let c=0; c<currentSize; c++) if(playerBoard[r][c]===solutionBoard[r][c]) filled++;
@@ -393,30 +451,38 @@
                 const { data: { user } } = await supabaseClient.auth.getUser();
                 if (!user) return alert("Not logged in!");
 
-                let { data: rows, error } = await supabaseClient.from('game_scores').select('score').eq('user_id', user.id);
+                // 1. SAVE SCORE
+                let { data: rows } = await supabaseClient.from('game_scores').select('score').eq('user_id', user.id);
                 let oldScore = (rows && rows.length > 0) ? rows[0].score : 0;
                 let newTotal = oldScore + currentRoundScore;
 
-                const { error: upsertError } = await supabaseClient
-                    .from('game_scores')
-                    .upsert({ 
-                        user_id: user.id, 
-                        score: newTotal, 
-                        time_taken: secondsElapsed,
-                        username: user.email.split('@')[0]
-                    });
+                const { error: upsertError } = await supabaseClient.from('game_scores').upsert({ 
+                    user_id: user.id, score: newTotal, time_taken: secondsElapsed, username: user.email.split('@')[0]
+                });
 
-                if (upsertError) {
-                    console.error(upsertError);
-                    alert("Error saving score: " + upsertError.message);
-                } else {
+                if (upsertError) console.error(upsertError);
+                else {
                     document.getElementById('game-card').classList.add('save-flash');
                     setTimeout(() => document.getElementById('game-card').classList.remove('save-flash'), 1000);
-                    alert(`Round Won!\nPrevious Total: ${oldScore}\nRound Score: ${currentRoundScore}\nNew Total: ${newTotal}`);
-                    showLeaderboard();
+                    alert(`Victory! New Score: ${newTotal}`);
+                    
+                    // 2. CHECK FEEDBACK STATUS
+                    const { data: feedbackData, error: feedbackError } = await supabaseClient
+                        .from('game_feedback')
+                        .select('*')
+                        .eq('user_id', user.id);
+                    
+                    if (!feedbackError && feedbackData.length === 0) {
+                        // If no feedback found, show the modal
+                        document.getElementById('feedback-modal').classList.remove('hidden');
+                    } else {
+                        // If feedback exists (or error), straight to leaderboard
+                        showLeaderboard();
+                    }
                 }
             }
         }
+
         checkUser();
     </script>
 </body>
